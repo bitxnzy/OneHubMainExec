@@ -23,28 +23,32 @@ local Window = MacLib:Window({
     AcrylicBlur = true
 })
 
-function findGui(parent, name)
-    return parent:FindFirstChild(name, true)
-end
+local aeuatConnection
+function aeuatFunction(enabled)
+    if enabled == false then
+        if aeuatConnection then
+            aeuatConnection:Disconnect()
+            aeuatConnection = nil
+        end
+        return
+    end
+    if aeuatConnection then
+        return
+    end
 
-function normalize(str)
-    return str:gsub("%s+", ""):lower()
-end
-
-function aeuatFunction()
     local teleportQueued = false
-    game.Players.LocalPlayer.OnTeleport:Connect(function(State)
+    aeuatConnection = game.Players.LocalPlayer.OnTeleport:Connect(function(State)
         if (State == Enum.TeleportState.Started or State == Enum.TeleportState.InProgress) and not teleportQueued then
             teleportQueued = true
 
-            queue_on_teleport([[         
+            queue_on_teleport([[
                         repeat task.wait() until game:IsLoaded()
-                        if getgenv().executedEnabled then return end    
+                        if getgenv().executedEnabled then return end
                         loadstring(game:HttpGet("https://raw.githubusercontent.com/bitxnzy/OneHubMainExec/main/mainexec.lua"))()
                     ]])
 
             getgenv().executedEnabled = true
-            wait(1)
+            task.wait(1)
             teleportQueued = false
         end
     end)
@@ -102,48 +106,6 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
-local originalSizes = {}
-local pcSize2 = Vector2.new(850, 650)
-local mobileSize2 = Vector2.new(750, 500)
-
-function isMobile()
-    return UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
-end
-
-function getBaseSize()
-    return isMobile() and mobileSize2 or pcSize2
-end
-
-function storeOriginalFrameSizes(guiObject)
-    for _, obj in ipairs(guiObject:GetDescendants()) do
-        if obj:IsA("Frame") then
-            if not originalSizes[obj] then
-                originalSizes[obj] = obj.Size
-            end
-        end
-    end
-end
-
-function resizeFrames(scale)
-    local gui = CoreGui:FindFirstChild("MaclibGui")
-    if not gui then
-        return
-    end
-
-    storeOriginalFrameSizes(gui)
-
-    local baseSize = getBaseSize()
-    local widthScale = (baseSize.X * scale) / baseSize.X
-    local heightScale = (baseSize.Y * scale) / baseSize.Y
-
-    for frame, originalSize in pairs(originalSizes) do
-        if frame and frame.Parent then
-            frame.Size = UDim2.new(originalSize.X.Scale, math.floor(originalSize.X.Offset * widthScale),
-                originalSize.Y.Scale, math.floor(originalSize.Y.Offset * heightScale))
-        end
-    end
-end
-
 local tabGroups = {
     TabGroup1 = Window:TabGroup()
 }
@@ -189,8 +151,6 @@ local sections = {
     })
 }
 
-local HttpService = game:GetService("HttpService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local player = Players.LocalPlayer
 local macrosFolder = "OneHub/_ATD_/Macros"
@@ -205,13 +165,30 @@ local recordingData = {
 }
 local startTime = 0
 local selectedMacro = "None"
+local autoCollectGiftsEnabled = false
+local autoCollectHourlyQuestsEnabled = false
+local autoCollectHalloweenPassEnabled = false
+local autoBuyUpgradeTowerEnabled = false
+local autoJoinEnabled = false
+local autoSkipWaveEnabled = false
+local autoRestartEnabled = false
+local autoVoteEnabled = false
+local hidePlayerEnabled = false
+local selectedStory = nil
+local selectedVote = nil
+local webhookUrl = ""
+local autoSendEnabled = false
+local sendWebhook -- forward declaration (definida mais abaixo)
+local selectedUIMacro -- forward declaration (dropdown criado mais abaixo)
+local SelectedMacroLabel -- forward declaration (label criado mais abaixo)
+local StepLabel, ActionLabel, WaitingLabel -- forward declaration (status do macro)
 task.spawn(function()
     task.wait(1.5)
     pcall(function()
         if MacLib.Options and MacLib.Options.selectedUIMacro and MacLib.Options.selectedUIMacro.Value then
             local savedVal = MacLib.Options.selectedUIMacro.Value
             if savedVal and savedVal ~= "" and savedVal ~= "None" then
-                selectedMacro = savedVal:gsub(".json$", "")
+                selectedMacro = savedVal:gsub("%.json$", "")
                 if SelectedMacroLabel and typeof(SelectedMacroLabel.UpdateName) == "function" then
                     SelectedMacroLabel:UpdateName("Selected Macro: " .. selectedMacro)
                 end
@@ -224,11 +201,8 @@ local selectedTypeOfRecord = "Time"
 local selectedDelayMacro = 0.2
 local macros = {}
 
-local Players = game:GetService("Players")
-local GuiService = game:GetService("GuiService")
 local TeleportService = game:GetService("TeleportService")
 
-local player = Players.LocalPlayer
 local placeId = game.PlaceId
 local tentandoReconectar = false
 
@@ -249,8 +223,8 @@ GuiService.ErrorMessageChanged:Connect(function(mensagem)
 
     local texto = string.lower(mensagem)
 
-    if string.find(texto, "lost connection", 1, true) or string.find(texto, "277", 1, true) or
-        string.find(texto, "769", 1, true) or string.find(texto, "1025", 1, true) then
+    if string.find(texto, "lost connection", 1, true) or string.find(texto, "%f[%d]277%f[%D]") or
+        string.find(texto, "%f[%d]769%f[%D]") or string.find(texto, "%f[%d]1025%f[%D]") then
 
         tentarReconectar(mensagem)
     end
@@ -285,41 +259,142 @@ local function getTowerPrice(towerInstance, priceType)
     return 0
 end
 
-local function updateDropdownFunction()
-    local newMacros = {}
-    if isfolder(macrosFolder) then
-        for _, file in ipairs(listfiles(macrosFolder)) do
-            local name = file:match("([^/\\]+)%.json$")
-            if name then
-                table.insert(newMacros, name)
-            end
+local function sanitizeMacroName(name)
+    name = tostring(name or "")
+    name = name:gsub("%.json$", "")
+    name = name:gsub("[\\/:*?\"<>|]", "")
+    name = name:gsub("^%s+", "")
+    name = name:gsub("%s+$", "")
+    return name
+end
+
+local function setSelectedMacro(name)
+    selectedMacro = (name and name ~= "") and name or "None"
+    if SelectedMacroLabel and typeof(SelectedMacroLabel.UpdateName) == "function" then
+        SelectedMacroLabel:UpdateName("Selected Macro: " .. selectedMacro)
+    end
+end
+
+-- ===== STATUS DO MACRO (Step / Action / Waiting) =====
+local macroStatusCache = {}
+local lastWaitingUpdate = 0
+
+local ACTION_NAMES = {
+    PlaceTower = "Placing unit",
+    UpgradeTower = "Upgrading unit",
+    SellTower = "Selling unit"
+}
+
+local function setStatusLabel(label, key, text)
+    if macroStatusCache[key] == text then
+        return
+    end
+    macroStatusCache[key] = text
+    if label and typeof(label.UpdateName) == "function" then
+        label:UpdateName(text)
+    end
+end
+
+-- 'force' ignora o limite de 0.2s (usado em mudancas de estado, nao em contagens)
+local function setWaiting(text, force)
+    local now = os.clock()
+    if not force and (now - lastWaitingUpdate) < 0.2 then
+        return
+    end
+    lastWaitingUpdate = now
+    setStatusLabel(WaitingLabel, "waiting", text)
+end
+
+local function setMacroStatus(stepText, actionText, waitingText, force)
+    if stepText then
+        setStatusLabel(StepLabel, "step", stepText)
+    end
+    if actionText then
+        setStatusLabel(ActionLabel, "action", actionText)
+    end
+    if waitingText then
+        setWaiting(waitingText, force)
+    end
+end
+
+local function resetMacroStatus()
+    setMacroStatus("Step: -", "Action: Idle", "Waiting: -", true)
+end
+
+local function describeAction(actionName, arguments)
+    local text = ACTION_NAMES[actionName] or tostring(actionName)
+    local unitName
+    for _, arg in ipairs(arguments or {}) do
+        if type(arg) == "string" then
+            unitName = arg
+            break
+        elseif type(arg) == "table" and arg.__Type == "TowerReference" and arg.Name then
+            unitName = arg.Name
+            break
         end
     end
+    if unitName then
+        text = text .. " (" .. unitName .. ")"
+    end
+    return text
+end
+
+local function formatSeconds(sec)
+    if sec >= 60 then
+        return string.format("%d:%02d", math.floor(sec / 60), math.floor(sec % 60))
+    end
+    return string.format("%.1fs", math.max(sec, 0.1))
+end
+
+local function formatCash(have, need)
+    return string.format("Cash %d/%d", math.floor(have), math.floor(need))
+end
+
+local function updateDropdownFunction(selectName)
+    local newMacros = {}
+    if not isfolder(macrosFolder) then
+        makefolder(macrosFolder)
+    end
+    for _, file in ipairs(listfiles(macrosFolder)) do
+        local name = file:match("([^/\\]+)%.json$")
+        if name then
+            table.insert(newMacros, name)
+        end
+    end
+    table.sort(newMacros)
     macros = newMacros
+
     if selectedUIMacro then
+        -- limpa as opcoes antigas e o estado interno do dropdown
         selectedUIMacro:ClearOptions()
+        selectedUIMacro.Value = nil
+        selectedUIMacro:UpdateName((selectedUIMacro.Settings.Name or "Select Macro") .. "...")
+
+        -- recria as opcoes com os arquivos atuais
         selectedUIMacro:InsertOptions(macros)
+
+        -- mantem/seleciona o macro desejado se ele ainda existir
+        local target = selectName or selectedMacro
+        if target and table.find(macros, target) then
+            selectedUIMacro:UpdateSelection(target)
+            setSelectedMacro(target)
+        else
+            setSelectedMacro("None")
+        end
     end
 end
 
 local function createJsonFileFunction(fileName)
-    if not fileName or fileName == "" or fileName == "None" then
-        return
+    fileName = sanitizeMacroName(fileName)
+    if fileName == "" or fileName == "None" then
+        return false
     end
     local filePath = macrosFolder .. "/" .. fileName .. ".json"
     if not isfile(filePath) then
         writefile(filePath, "{}")
     end
-    updateDropdownFunction()
-    selectedMacro = fileName
-
-    if SelectedMacroLabel and typeof(SelectedMacroLabel.UpdateName) == "function" then
-        SelectedMacroLabel:UpdateName("Selected Macro: " .. selectedMacro)
-    end
-
-    if selectedUIMacro then
-        selectedUIMacro:SetOption(fileName)
-    end
+    updateDropdownFunction(fileName)
+    return true
 end
 
 updateDropdownFunction()
@@ -440,46 +515,74 @@ local function collectRemoteInfoFunction(remoteName, args)
     end
 
     table.insert(recordingData.steps, remoteData)
+
+    setMacroStatus(
+        string.format("Step: %d (recording)", remoteData.index),
+        "Action: " .. describeAction(remoteName, remoteData.arguments),
+        "Waiting: Your next action",
+        true
+    )
 end
 
 local originalNamecall
 originalNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+    -- caminho rapido: nao aloca nada quando nao esta gravando
+    if not isRecording or checkcaller() then
+        return originalNamecall(self, ...)
+    end
+
     local method = getnamecallmethod()
-    local args = {...}
+    if method ~= "InvokeServer" and method ~= "FireServer" then
+        return originalNamecall(self, ...)
+    end
+
     local remoteName = self.Name
     if remoteName == "GetData" or remoteName == "GetGameSpeedState" then
         return originalNamecall(self, ...)
     end
 
-    local results = {originalNamecall(self, ...)}
+    local args = {...}
+    local results = table.pack(originalNamecall(self, ...))
 
-    if isRecording and not checkcaller() then
-        if method == "InvokeServer" or method == "FireServer" then
-            local rfFolder = ReplicatedStorage:FindFirstChild("RemoteFunctions", true) or
-                                 ReplicatedStorage:FindFirstChild("Remotes", true)
-            if rfFolder and (self.Parent == rfFolder or self:IsDescendantOf(rfFolder)) then
-                pcall(function()
-                    task.spawn(function()
-                        collectRemoteInfoFunction(remoteName, args)
-                    end)
-                end)
-            end
-        end
+    local rfFolder = ReplicatedStorage:FindFirstChild("RemoteFunctions", true) or
+                         ReplicatedStorage:FindFirstChild("Remotes", true)
+    if rfFolder and (self.Parent == rfFolder or self:IsDescendantOf(rfFolder)) then
+        task.spawn(function()
+            pcall(collectRemoteInfoFunction, remoteName, args)
+        end)
     end
 
-    return unpack(results)
+    return table.unpack(results, 1, results.n)
 end)
 
-local function playMacro(macroName)
-    task.spawn(function()
-        task.wait(1)
-        if MacLib.Options and MacLib.Options.selectedUIMacro and MacLib.Options.selectedUIMacro.Value then
-            selectedMacro = MacLib.Options.selectedUIMacro.Value:gsub(".json$", "")
-            if SelectedMacroLabel and typeof(SelectedMacroLabel.UpdateName) == "function" then
-                SelectedMacroLabel:UpdateName("Selected Macro: " .. selectedMacro)
-            end
+-- Espera o tempo e/ou dinheiro do passo (conforme o Recording Type) mostrando o que falta
+local function waitForStepRequirements(step, startedAt)
+    local useTime = (selectedTypeOfRecord == "Time" or selectedTypeOfRecord == "Hybrid") and step.time ~= nil
+    local useCash = (selectedTypeOfRecord == "Cash" or selectedTypeOfRecord == "Hybrid") and step.cash ~= nil
+
+    while isPlaying do
+        local timeLeft = useTime and (step.time - (tick() - startedAt)) or 0
+        local currentCash = getPlayerCash()
+        local missingCash = useCash and currentCash < step.cash
+
+        if timeLeft <= 0 and not missingCash then
+            break
         end
-    end)
+
+        local parts = {}
+        if timeLeft > 0 then
+            table.insert(parts, "Time " .. formatSeconds(timeLeft))
+        end
+        if missingCash then
+            table.insert(parts, formatCash(currentCash, step.cash))
+        end
+        setWaiting("Waiting: " .. table.concat(parts, " + "))
+
+        task.wait(timeLeft > 0 and 0.05 or 0.2)
+    end
+end
+
+local function playMacro(macroName)
     if not macroName or macroName == "None" then
         return
     end
@@ -498,6 +601,13 @@ local function playMacro(macroName)
     end
 
     isPlaying = true
+
+    setMacroStatus(
+        string.format("Step: 0/%d", #macroData.steps),
+        "Action: Waiting for the match",
+        "Waiting: Wave 1",
+        true
+    )
 
     local playerGui = player:WaitForChild("PlayerGui")
     while isPlaying do
@@ -523,43 +633,44 @@ local function playMacro(macroName)
     end
 
     if not isPlaying then
+        resetMacroStatus()
         return
     end
+
+    local remoteContainer = ReplicatedStorage:FindFirstChild("RemoteFunctions", true) or ReplicatedStorage
+    local remoteCache = {}
 
     local playbackStartTime = tick()
     task.wait(1)
 
-    for i = 1, #macroData.steps do
+    local totalSteps = #macroData.steps
+    local completed = true
+
+    for i = 1, totalSteps do
         if not isPlaying then
+            completed = false
             break
         end
         local step = macroData.steps[i]
 
-        if selectedTypeOfRecord == "Time" and step.time then
-            local targetTime = step.time
-            while isPlaying and (targetTime - (tick() - playbackStartTime)) > 0 do
-                task.wait(0.05)
-            end
-        elseif selectedTypeOfRecord == "Cash" and step.cash then
-            while isPlaying and getPlayerCash() < step.cash do
-                task.wait(0.2)
-            end
-        elseif selectedTypeOfRecord == "Hybrid" then
-            if step.time then
-                local targetTime = step.time
-                while isPlaying and (targetTime - (tick() - playbackStartTime)) > 0 do
-                    task.wait(0.05)
-                end
-            end
-            if step.cash then
-                while isPlaying and getPlayerCash() < step.cash do
-                    task.wait(0.2)
-                end
-            end
-        end
+        setMacroStatus(
+            string.format("Step: %d/%d", i, totalSteps),
+            "Action: " .. describeAction(step.action, step.arguments)
+        )
 
-        local remoteContainer = ReplicatedStorage:FindFirstChild("RemoteFunctions", true) or ReplicatedStorage
-        local targetRemote = remoteContainer:FindFirstChild(step.action, true)
+        waitForStepRequirements(step, playbackStartTime)
+
+        if not isPlaying then
+            completed = false
+            break
+        end
+        setWaiting("Waiting: Executing action", true)
+
+        local targetRemote = remoteCache[step.action]
+        if not targetRemote or not targetRemote.Parent then
+            targetRemote = remoteContainer:FindFirstChild(step.action, true)
+            remoteCache[step.action] = targetRemote
+        end
 
         if targetRemote then
             pcall(function()
@@ -576,6 +687,7 @@ local function playMacro(macroName)
                     targetRemote:InvokeServer(unpack(realArgs))
 
                     if expectedCFrame then
+                        setWaiting("Waiting: Unit to appear", true)
                         local checkStart = tick()
                         while tick() - checkStart < 1.5 do
                             if findTowerByCFrame(expectedCFrame, 1.5) then
@@ -592,6 +704,7 @@ local function playMacro(macroName)
 
                         if requiredCash > 0 then
                             while isPlaying and getPlayerCash() < requiredCash do
+                                setWaiting("Waiting: " .. formatCash(getPlayerCash(), requiredCash))
                                 task.wait(0.2)
                             end
                         end
@@ -617,23 +730,43 @@ local function playMacro(macroName)
     end
 
     isPlaying = false
+    if completed then
+        setMacroStatus(
+            string.format("Step: %d/%d", totalSteps, totalSteps),
+            "Action: Finished",
+            "Waiting: -",
+            true
+        )
+    else
+        resetMacroStatus()
+    end
 end
 
-local HttpService = game:GetService("HttpService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local remoteFunctions = ReplicatedStorage:WaitForChild("RemoteFunctions", 10)
+local remoteFunc = remoteFunctions and remoteFunctions:FindFirstChild("GetData")
 
-local remoteFunc = ReplicatedStorage:FindFirstChild("RemoteFunctions"):FindFirstChild("GetData")
-local data = remoteFunc:InvokeServer()
+local function getPlayerData()
+    if not remoteFunc then
+        return nil
+    end
+    local ok, result = pcall(function()
+        return remoteFunc:InvokeServer()
+    end)
+    return ok and result or nil
+end
 
 function autoCollectGiftsFunction()
-    local claimRemote = ReplicatedStorage:FindFirstChild("RemoteFunctions"):FindFirstChild("ClaimPlaytimeGift")
+    local claimRemote = remoteFunctions and remoteFunctions:FindFirstChild("ClaimPlaytimeGift")
+    if not claimRemote then
+        return
+    end
     task.spawn(function()
         local estaPronto = checarMapaWorkspace()
         if estaPronto then
             return
         end
         while autoCollectGiftsEnabled do
-            local currentData = remoteFunc:InvokeServer()
+            local currentData = getPlayerData()
             if currentData and currentData.PlaytimeGifts then
                 local playtimeGifts = currentData.PlaytimeGifts
                 local currentDay = playtimeGifts.Day
@@ -660,15 +793,19 @@ function autoCollectGiftsFunction()
 end
 
 function autoCollectHourlyQuestsFunction()
-    local claimQuestRemote = ReplicatedStorage:FindFirstChild("RemoteFunctions"):FindFirstChild("ClaimQuest")
+    local claimQuestRemote = remoteFunctions and remoteFunctions:FindFirstChild("ClaimQuest")
+    if not claimQuestRemote then
+        return
+    end
     task.spawn(function()
         local estaPronto = checarMapaWorkspace()
         if estaPronto then
             return
         end
         while autoCollectHourlyQuestsEnabled do
-            if data and data.SeasonQuestsHourly then
-                local hourlyData = data.SeasonQuestsHourly
+            local currentData = getPlayerData() -- antes usava um snapshot velho
+            if currentData and currentData.SeasonQuestsHourly then
+                local hourlyData = currentData.SeasonQuestsHourly
                 local cycleId = hourlyData.CycleId
                 local slots = hourlyData.Slots or {}
 
@@ -690,7 +827,10 @@ function autoCollectHourlyQuestsFunction()
 end
 
 function autoCollectHalloweenPassFunction()
-    local claimQuestRemote = ReplicatedStorage:FindFirstChild("RemoteFunctions"):FindFirstChild("ClaimQuest")
+    local claimRemote = remoteFunctions and remoteFunctions:FindFirstChild("ClaimSeasonReward")
+    if not claimRemote then
+        return
+    end
     task.spawn(function()
         local estaPronto = checarMapaWorkspace()
         if estaPronto then
@@ -698,23 +838,29 @@ function autoCollectHalloweenPassFunction()
         end
         while autoCollectHalloweenPassEnabled do
             for i = 1, 50 do
-                local args = {
-                    [1] = tonumber(i),
-                    [2] = "Free"
-                }
-
-                game:GetService("ReplicatedStorage"):FindFirstChild("RemoteFunctions"):FindFirstChild(
-                    "ClaimSeasonReward"):InvokeServer(unpack(args))
-                wait(1)
-                local args = {
-                    [1] = tonumber(i),
-                    [2] = "Paid"
-                }
-
-                game:GetService("ReplicatedStorage"):FindFirstChild("RemoteFunctions"):FindFirstChild(
-                    "ClaimSeasonReward"):InvokeServer(unpack(args))
+                if not autoCollectHalloweenPassEnabled then
+                    break
+                end
+                pcall(function()
+                    claimRemote:InvokeServer(i, "Free")
+                end)
+                task.wait(0.5)
+                if not autoCollectHalloweenPassEnabled then
+                    break
+                end
+                pcall(function()
+                    claimRemote:InvokeServer(i, "Paid")
+                end)
+                task.wait(0.5)
             end
-            task.wait(1)
+
+            -- passada completa: espera antes de repetir (e para na hora se desligar)
+            for _ = 1, 60 do
+                if not autoCollectHalloweenPassEnabled then
+                    break
+                end
+                task.wait(1)
+            end
         end
     end)
 end
@@ -723,7 +869,6 @@ local modulesFolder = ReplicatedStorage:FindFirstChild("Modules")
 local upgradeConfigModule = modulesFolder and modulesFolder:FindFirstChild("UpgradeTreeConfig")
 local upgradeConfig = upgradeConfigModule and require(upgradeConfigModule) or "None"
 local selectedNode = "Start"
-local autoBuyEnabled = false
 local upgradeOptions = {}
 if type(upgradeConfig) == "table" and upgradeConfig.Order then
     for _, nodeName in ipairs(upgradeConfig.Order) do
@@ -744,7 +889,7 @@ function autoBuyUpgradeTowerFunction()
         if estaPronto then
             return
         end
-        while autoBuyEnabled do
+        while autoBuyUpgradeTowerEnabled do
             if selectedNode then
                 local args = {
                     [1] = "Purchase",
@@ -760,15 +905,7 @@ end
 local Workspace = game:GetService("Workspace")
 
 function checarMapaWorkspace()
-    local mapId = Workspace:GetAttribute("MapId")
-    local mapDisplayName = Workspace:GetAttribute("MapDisplayName")
-    local mapReady = Workspace:GetAttribute("MapReady")
-
-    if mapReady then
-        return true
-    else
-        return false
-    end
+    return Workspace:GetAttribute("MapReady") == true
 end
 
 function autoVoteFunction()
@@ -807,54 +944,35 @@ local jaDeuReplay = false
 
 function autoRestartFunction()
     task.spawn(function()
-        local ReplicatedStorage = game:GetService("ReplicatedStorage")
         local playerGui = player:WaitForChild("PlayerGui")
         local replayRemote = ReplicatedStorage
             :WaitForChild("RemoteEvents")
             :WaitForChild("ReplayVote")
 
+        local function endScreenVisible()
+            local endGui = playerGui:FindFirstChild("GameEndUI")
+            local frame = endGui and endGui:FindFirstChild("NewFrame")
+            return endGui ~= nil and endGui.Enabled and frame ~= nil and frame.Visible
+        end
+
         while autoRestartEnabled do
-            replayRemote:FireServer(true)
-            local deadline = os.clock() + 8
-            local endFrame
+            if endScreenVisible() then
+                task.wait(0.1) -- deixa a tela de fim assentar antes de votar
 
-            repeat
-                local endGui = playerGui:FindFirstChild("GameEndUI")
-                local frame = endGui and endGui:FindFirstChild("NewFrame")
-
-                if endGui and endGui.Enabled
-                    and frame and frame.Visible then
-                    endFrame = frame
-                    break
-                end
-
-                task.wait(0.03)
-            until not autoRestartEnabled or os.clock() >= deadline
-
-            if not autoRestartEnabled then
-                break
-            end
-
-            if endFrame then
-                task.wait(0.1)
-
-                if autoSendEnabled then
-                    task.spawn(sendWebhook)
-                end
-                repeat
-                    task.wait(0.05)
-
-                    local endGui = playerGui:FindFirstChild("GameEndUI")
-                    local currentFrame = endGui
-                        and endGui:FindFirstChild("NewFrame")
-
-                    if not currentFrame or not currentFrame.Visible
-                        or not endGui.Enabled then
-                        break
+                -- vota assim que a tela aparece e repete a cada 2s enquanto ela
+                -- continuar visivel (caso o primeiro voto seja ignorado)
+                local lastVote = -math.huge
+                while autoRestartEnabled and endScreenVisible() do
+                    if os.clock() - lastVote >= 2 then
+                        lastVote = os.clock()
+                        pcall(function()
+                            replayRemote:FireServer(true)
+                        end)
                     end
-                until not autoRestartEnabled
+                    task.wait(0.1)
+                end
             else
-                task.wait(1)
+                task.wait(0.1)
             end
         end
     end)
@@ -868,8 +986,9 @@ local autoLeaveAfterEnabled = false
 
 function autoLeaveFunction()
     task.spawn(function()
+        local returnRemote = ReplicatedStorage:WaitForChild("ReturnToLobby")
         while autoLeaveEnabled or autoLeaveAfterEnabled do
-            game:GetService("ReplicatedStorage"):WaitForChild("ReturnToLobby"):FireServer(true)
+            returnRemote:FireServer(true)
 
             if autoLeaveAfterEnabled then
                 matchesPlayed = matchesPlayed + 1
@@ -945,6 +1064,10 @@ function autoJoinFunction()
             return
         end
 
+        local joinQueue = ReplicatedStorage:WaitForChild("Packages"):WaitForChild("_Index")
+            :WaitForChild("sleitnick_knit@1.7.0"):WaitForChild("knit"):WaitForChild("Services")
+            :WaitForChild("MatchmakingService"):WaitForChild("RF"):WaitForChild("JoinQueue")
+
         while autoJoinEnabled do
             local mapId = selectedStory
             if mapConfig and typeof(mapConfig.GetAll) == "function" then
@@ -956,14 +1079,9 @@ function autoJoinFunction()
                 end
             end
 
-            local args = {
-                [1] = mapId,
-                [2] = 1
-            }
-
-            ReplicatedStorage:WaitForChild("Packages"):WaitForChild("_Index"):WaitForChild("sleitnick_knit@1.7.0")
-                :WaitForChild("knit"):WaitForChild("Services"):WaitForChild("MatchmakingService"):WaitForChild("RF")
-                :WaitForChild("JoinQueue"):InvokeServer(unpack(args))
+            pcall(function()
+                joinQueue:InvokeServer(mapId, 1)
+            end)
             task.wait(1)
         end
     end)
@@ -979,10 +1097,15 @@ function autoSpeedFunction()
     end)
 end
 
-local webhookUrl = ""
-local autoSendEnabled = false
+local function getText(root, ...)
+    local node = root
+    for _, childName in ipairs({...}) do
+        node = node and node:FindFirstChild(childName)
+    end
+    return node and node.Text or "N/A"
+end
 
-local function sendWebhook()
+function sendWebhook()
     if webhookUrl == "" then
         return
     end
@@ -997,10 +1120,10 @@ local function sendWebhook()
     if not newFrame then return end
     local mapDisplayName = workspace:GetAttribute("mapdisplayname") or workspace:GetAttribute("MapDisplayName") or "Unknown Map"
     local upside = newFrame:FindFirstChild("Upside")
-    local runTime = (upside and upside:FindFirstChild("Timer") and upside.Timer:FindFirstChild("TextLabel")) and upside.Timer.TextLabel.Text or "N/A"
-    local status = (upside and upside:FindFirstChild("StatusFrame") and upside.StatusFrame:FindFirstChild("Status")) and upside.StatusFrame.Status.Text or "N/A"
-    local mode = (upside and upside:FindFirstChild("Mode") and upside.Mode:FindFirstChild("Mode")) and upside.Mode.Mode.Text or "N/A"
-    local winStreak = (upside and upside:FindFirstChild("WinStreak") and upside.WinStreak:FindFirstChild("Title")) and upside.WinStreak.Title.Text or "N/A"
+    local runTime = getText(upside, "Timer", "TextLabel")
+    local status = getText(upside, "StatusFrame", "Status")
+    local mode = getText(upside, "Mode", "Mode")
+    local winStreak = getText(upside, "WinStreak", "Title")
     local rewardsList = {}
     local listRewardsFolder = newFrame:FindFirstChild("ListRewards")
 
@@ -1043,12 +1166,14 @@ local function sendWebhook()
 
     local httpRequest = (syn and syn.request) or (http and http.request) or http_request or request
     if httpRequest then
-        httpRequest({
-            Url = webhookUrl,
-            Method = "POST",
-            Headers = { ["Content-Type"] = "application/json" },
-            Body = HttpService:JSONEncode(payload)
-        })
+        pcall(function()
+            httpRequest({
+                Url = webhookUrl,
+                Method = "POST",
+                Headers = { ["Content-Type"] = "application/json" },
+                Body = HttpService:JSONEncode(payload)
+            })
+        end)
     end
 end
 
@@ -1056,9 +1181,16 @@ sections.MainSection1:Toggle({
     Name = "Hide Player Info",
     Default = false,
     Callback = function(value)
-        while value do
-            MacLib:HidePlayer(value)
-            task.wait(0.1)
+        hidePlayerEnabled = value
+        if value then
+            task.spawn(function()
+                while hidePlayerEnabled do
+                    pcall(function()
+                        MacLib:HidePlayer(true)
+                    end)
+                    task.wait(1)
+                end
+            end)
         end
     end
 }, "HidePlayerInfoToggle")
@@ -1067,8 +1199,8 @@ sections.MainSection1:Toggle({
     Name = "Auto Collect Gifts",
     Default = false,
     Callback = function(value)
+        autoCollectGiftsEnabled = value
         if value then
-            autoCollectGiftsEnabled = value
             autoCollectGiftsFunction()
         end
     end
@@ -1078,8 +1210,8 @@ sections.MainSection1:Toggle({
     Name = "Auto Collect Quests",
     Default = false,
     Callback = function(value)
+        autoCollectHourlyQuestsEnabled = value
         if value then
-            autoCollectHourlyQuestsEnabled = value
             autoCollectHourlyQuestsFunction()
         end
     end
@@ -1089,8 +1221,8 @@ sections.MainSection1:Toggle({
     Name = "Auto Collect Halloween Pass",
     Default = false,
     Callback = function(value)
+        autoCollectHalloweenPassEnabled = value
         if value then
-            autoCollectHalloweenPassEnabled = value
             autoCollectHalloweenPassFunction()
         end
     end
@@ -1264,15 +1396,27 @@ local RecordingMethodLabel = sections.MainSection80:Label({
     Text = "Recording Method: Time"
 })
 
-local SelectedMacroLabel = sections.MainSection80:Label({
+SelectedMacroLabel = sections.MainSection80:Label({
     Text = "Selected Macro: None"
+})
+
+StepLabel = sections.MainSection80:Label({
+    Text = "Step: -"
+})
+
+ActionLabel = sections.MainSection80:Label({
+    Text = "Action: Idle"
+})
+
+WaitingLabel = sections.MainSection80:Label({
+    Text = "Waiting: -"
 })
 
 sections.MainSection80:Divider()
 
 updateDropdownFunction()
 
-local selectedUIMacro = sections.MainSection80:Dropdown({
+selectedUIMacro = sections.MainSection80:Dropdown({
     Name = "Select Macro",
     Multi = false,
     Required = true,
@@ -1280,15 +1424,9 @@ local selectedUIMacro = sections.MainSection80:Dropdown({
     Default = "None",
     Callback = function(Value)
         if Value and Value ~= "" and Value ~= "None" then
-            selectedMacro = Value:gsub(".json$", "")
-            if SelectedMacroLabel and typeof(SelectedMacroLabel.UpdateName) == "function" then
-                SelectedMacroLabel:UpdateName("Selected Macro: " .. selectedMacro)
-            end
+            setSelectedMacro((Value:gsub("%.json$", "")))
         else
-            selectedMacro = "None"
-            if SelectedMacroLabel and typeof(SelectedMacroLabel.UpdateName) == "function" then
-                SelectedMacroLabel:UpdateName("Selected Macro: None")
-            end
+            setSelectedMacro("None")
         end
     end
 }, "selectedUIMacro")
@@ -1309,15 +1447,23 @@ sections.MainSection80:Button({
     Name = "Refresh List",
     Callback = function()
         updateDropdownFunction()
+        Window:Notify({
+            Title = Window.Settings.Title,
+            Description = "Macro list refreshed (" .. #macros .. ")",
+            Lifetime = 3
+        })
     end
 })
 
 sections.MainSection80:Button({
     Name = "Create Macro",
     Callback = function()
-        if macroName and macroName ~= "" then
-            createJsonFileFunction(macroName)
-        end
+        local ok = createJsonFileFunction(macroName)
+        Window:Notify({
+            Title = Window.Settings.Title,
+            Description = ok and ("Macro created: " .. sanitizeMacroName(macroName)) or "Type a valid macro name",
+            Lifetime = 3
+        })
     end
 })
 
@@ -1328,31 +1474,51 @@ sections.MainSection80:Button({
             local filePath = macrosFolder .. "/" .. selectedMacro .. ".json"
             if isfile(filePath) then
                 delfile(filePath)
-                selectedMacro = "None"
-                SelectedMacroLabel:UpdateName("Selected Macro: None")
+                local deleted = selectedMacro
+                setSelectedMacro("None")
                 updateDropdownFunction()
+                Window:Notify({
+                    Title = Window.Settings.Title,
+                    Description = "Macro deleted: " .. deleted,
+                    Lifetime = 3
+                })
+                return
             end
         end
+        Window:Notify({
+            Title = Window.Settings.Title,
+            Description = "No macro selected",
+            Lifetime = 3
+        })
     end
 })
 
+local recordingTarget = nil
 local RecordMacroToggle
 RecordMacroToggle = sections.MainSection80:Toggle({
     Name = "Record Macro",
     Default = false,
     Callback = function(value)
         if value then
-            if (not selectedMacro or selectedMacro == "None") and macros and #macros > 0 then
-                selectedMacro = macros[1]
-                SelectedMacroLabel:UpdateName("Selected Macro: " .. selectedMacro)
-            end
-
             if not selectedMacro or selectedMacro == "None" then
                 isRecording = false
+                recordingTarget = nil
+                Window:Notify({
+                    Title = Window.Settings.Title,
+                    Description = "Select or create a macro before recording",
+                    Lifetime = 3
+                })
+                task.defer(function()
+                    if RecordMacroToggle and typeof(RecordMacroToggle.SetState) == "function" then
+                        RecordMacroToggle:SetState(false)
+                    end
+                end)
                 return
             end
-            
+
+            recordingTarget = selectedMacro
             isRecording = true
+            setMacroStatus("Step: 0 (recording)", "Action: Waiting for your first action", "Waiting: Your next action", true)
             recordingData = {
                 steps = {},
                 currentStepIndex = 0
@@ -1378,8 +1544,8 @@ RecordMacroToggle = sections.MainSection80:Toggle({
             end)
         else
             isRecording = false
-            if recordingData and recordingData.steps and #recordingData.steps > 0 then
-                local filePath = macrosFolder .. "/" .. selectedMacro .. ".json"
+            if recordingTarget and recordingData and recordingData.steps and #recordingData.steps > 0 then
+                local filePath = macrosFolder .. "/" .. recordingTarget .. ".json"
                 table.sort(recordingData.steps, function(a, b)
                     return a.index < b.index
                 end)
@@ -1390,6 +1556,12 @@ RecordMacroToggle = sections.MainSection80:Toggle({
                     writefile(filePath, jsonData)
                 end
             end
+            recordingTarget = nil
+            recordingData = {
+                steps = {},
+                currentStepIndex = 0
+            }
+            resetMacroStatus()
         end
     end
 }, "RecordMacroToggle")
@@ -1416,6 +1588,7 @@ PlayMacroToggle = sections.MainSection80:Toggle({
             end)
         else
             isPlaying = false
+            resetMacroStatus()
         end
     end
 }, "PlayMacroToggle")
@@ -1463,7 +1636,7 @@ sections.MainSection99:Toggle({
 sections.MainSection99:Button({
     Name = "Test / Send Webhook Now",
     Callback = function()
-        sendWebhook()
+        task.spawn(sendWebhook)
     end
 }, "testWebhookButton")
 
@@ -1475,42 +1648,38 @@ task.spawn(function()
     local lastFrame = nil
 
     while true do
-        task.wait(0.1)
-
-        if not autoSendEnabled or sending then
-            continue
-        end
-
-        local endGui = playerGui:FindFirstChild("GameEndUI")
-        local frame = endGui and endGui:FindFirstChild("NewFrame")
-
-        if not endGui or not frame or not endGui.Enabled or not frame.Visible then
+        if not autoSendEnabled then
             lastFrame = nil
-            continue
+            task.wait(1)
+        else
+            task.wait(0.25)
+
+            if not sending then
+                local endGui = playerGui:FindFirstChild("GameEndUI")
+                local frame = endGui and endGui:FindFirstChild("NewFrame")
+
+                if not endGui or not frame or not endGui.Enabled or not frame.Visible then
+                    lastFrame = nil
+                elseif frame ~= lastFrame then
+                    lastFrame = frame
+                    sending = true
+
+                    task.spawn(function()
+                        task.wait(0.1)
+                        pcall(sendWebhook)
+                        sending = false
+                    end)
+                end
+            end
         end
-
-        if frame == lastFrame then
-            continue
-        end
-
-        lastFrame = frame
-        sending = true
-
-        task.spawn(function()
-            task.wait(0.1)
-            sendWebhook()
-            sending = false
-        end)
     end
 end)
-
-
 
 sections.MainSection100:Toggle({
     Name = "Auto Execute",
     Default = false,
     Callback = function(value)
-        aeuatFunction()
+        aeuatFunction(value)
     end
 }, "AutoExecuteToggle")
 
@@ -1546,25 +1715,32 @@ sections.MainSection100:Slider({
     DisplayMethod = "Value",
     Precision = 1,
     Callback = function(Value)
-        scale = MacLib.Options.ChangeUISizeSlider.Value
+        local scale = MacLib.Options.ChangeUISizeSlider.Value
         MacLib:changeUISize(scale)
     end
 }, "ChangeUISizeSlider")
 
-Window.onUnloaded(function()
-end)
 tabs.Main:Select()
 
 MacLib:SetFolder("One Hub")
 MacLib:SetFolder("One Hub/_ATD_")
 local GameConfigName = "_ATD_"
-local player = game.Players.LocalPlayer
-MacLib:LoadConfig(player.Name .. GameConfigName)
-spawn(function()
-    while task.wait(1) do
-        MacLib:SaveConfig(player.Name .. GameConfigName)
+local configName = player.Name .. GameConfigName
+MacLib:LoadConfig(configName)
+
+local function saveConfigSafe()
+    pcall(function()
+        MacLib:SaveConfig(configName)
+    end)
+end
+
+task.spawn(function()
+    while task.wait(5) do -- antes: 1s (escrita em disco constante)
+        saveConfigSafe()
     end
 end)
+
+Window.onUnloaded(saveConfigSafe)
 
 local VirtualUser = game:GetService("VirtualUser")
 local LocalPlayer = game:GetService("Players").LocalPlayer
