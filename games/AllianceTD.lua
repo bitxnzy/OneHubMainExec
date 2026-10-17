@@ -43,7 +43,11 @@ function aeuatFunction(enabled)
 
             queue_on_teleport([[
                         repeat task.wait() until game:IsLoaded()
+<<<<<<< HEAD
                         if getgenv().executedEnabled then return end
+=======
+                        if getgenv().executedEnabled then return end    
+>>>>>>> 4c87d72 (corrigido o errado da farmação de aura)
                         loadstring(game:HttpGet("https://raw.githubusercontent.com/bitxnzy/OneHubMainExec/main/mainexec.lua"))()
                     ]])
 

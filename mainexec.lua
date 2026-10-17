@@ -3,7 +3,8 @@ local AllowedPlaceIds = {
     [99703116573266] = true,
 }
 local Games = {
-    ["AllianceTD"] = { 99703116573266, 117654154793149 }
+    ["AllianceTD"] = { 99703116573266, 117654154793149 },
+    ["AnimeAdventures"] = { 8304191830, 8349889591, 14229762361, 14918509670, 14229839966, 3183403065 },
 }
 
 local PlaceToGame = {}
