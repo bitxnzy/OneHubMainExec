@@ -5,7 +5,7 @@ warn("[One HUB] Loading Ui")
 task.wait()
 
 local MacLib =
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/TrilhaX/maclibTempestHubUI/main/maclib.lua"))()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/bitxnzy/OneHubMainExec/main/mainexec.lua"))()
 
 local isMobile = game:GetService("UserInputService").TouchEnabled
 local pcSize = UDim2.fromOffset(850, 650)
@@ -196,7 +196,7 @@ local recordingData = {
     currentStepIndex = 0
 }
 local startTime = 0
-local selectedMacro = "None"
+local selectedMacro = (MacLib.Options.selectedUIMacro and MacLib.Options.selectedUIMacro.Value) or "None"
 local macroName = ""
 local selectedTypeOfRecord = "Time"
 local selectedDelayMacro = 0.2
@@ -285,12 +285,18 @@ local function createJsonFileFunction(fileName)
         return
     end
     local filePath = macrosFolder .. "/" .. fileName .. ".json"
-    if isfile(filePath) then
-        return
+    if not isfile(filePath) then
+        writefile(filePath, "{}")
     end
-    writefile(filePath, "{}")
     updateDropdownFunction()
+    selectedMacro = fileName
+    SelectedMacroLabel:UpdateName("Selected Macro: " .. selectedMacro)
+    if selectedUIMacro then
+        selectedUIMacro:SetOption(fileName)
+    end
 end
+
+updateDropdownFunction()
 
 local function getTowerCFrame(towerInstance)
     if not towerInstance then
@@ -415,6 +421,10 @@ originalNamecall = hookmetamethod(game, "__namecall", function(self, ...)
     local method = getnamecallmethod()
     local args = {...}
     local remoteName = self.Name
+    if remoteName == "GetData" or remoteName == "GetGameSpeedState" then
+        return originalNamecall(self, ...)
+    end
+
     local results = {originalNamecall(self, ...)}
 
     if isRecording and not checkcaller() then
@@ -761,14 +771,12 @@ function autoVoteFunction()
     end)
 end
 
+local jaDeuReplay = false
 function autoRestartFunction()
     task.spawn(function()
-        local gui = game:GetService("Players").LocalPlayer.PlayerGui:FindFirstChild("GameEndUI")
-        if not gui then
-            return
-        end
-        while gui.Enabled == true and gui.NewFrame.Visible == true and autoRestartEnabled do
-            game:GetService("ReplicatedStorage"):WaitForChild("RemoteEvents"):WaitForChild("ReplayVote"):FireServer()
+        while autoRestartEnabled do
+            game:GetService("ReplicatedStorage"):WaitForChild("RemoteEvents"):WaitForChild("ReplayVote")
+                :FireServer(true)
             task.wait(1)
         end
     end)
@@ -776,22 +784,23 @@ end
 
 local matchesPlayed = 0
 local targetMatches = 1
+local autoLeaveEnabled = false
 local autoLeaveAfterEnabled = false
 
 function autoLeaveFunction()
     task.spawn(function()
-        local playerGui = game:GetService("Players").LocalPlayer:FindFirstChild("PlayerGui")
-        local gui = playerGui and playerGui:FindFirstChild("GameEndUI")
-        if not gui then
-            return
-        end
-        while gui.Enabled == true and gui.NewFrame.Visible == true and autoLeaveAfterEnabled do
-            game:GetService("ReplicatedStorage"):WaitForChild("ReturnToLobby"):FireServer()
-            matchesPlayed = matchesPlayed + 1
-            if matchesPlayed >= targetMatches then
-                autoLeaveAfterEnabled = false
-                break
+        while autoLeaveEnabled or autoLeaveAfterEnabled do
+            game:GetService("ReplicatedStorage"):WaitForChild("ReturnToLobby"):FireServer(true)
+            
+            if autoLeaveAfterEnabled then
+                matchesPlayed = matchesPlayed + 1
+                if matchesPlayed >= targetMatches then
+                    autoLeaveAfterEnabled = false
+                    autoLeaveEnabled = false
+                    break
+                end
             end
+            
             task.wait(1)
         end
     end)
@@ -886,8 +895,8 @@ function autoSpeedFunction()
         local remote = game:GetService("ReplicatedStorage"):WaitForChild("RemoteFunctions"):WaitForChild(
             "GetGameSpeedState")
         local data = remote:InvokeServer()
-        data.MaxSpeed = 3
-        data.Speed = 3
+        data.MaxSpeed = 1.5
+        data.Speed = 1.5
     end)
 end
 
@@ -956,7 +965,7 @@ sections.MainSection1:Toggle({
             autoBuyUpgradeTowerFunction()
         end
     end
-}, "AutoCollectHalloweenPassToggle")
+}, "AutoBuyUpgradeTowerToggle")
 
 local selectedStoryDropdown = sections.MainSection1:Dropdown({
     Name = "Select Story",
@@ -1064,6 +1073,11 @@ sections.MainSection2:Toggle({
     Default = false,
     Callback = function(value)
         autoLeaveAfterEnabled = value
+
+        if value then
+            matchesPlayed = 0
+            autoLeaveFunction()
+        end
     end
 }, "AutoLeaveAfterToggle")
 
@@ -1113,8 +1127,10 @@ local selectedUIMacro = sections.MainSection80:Dropdown({
     Options = macros,
     Default = "None",
     Callback = function(Value)
-        selectedMacro = Value:gsub(".json$", "")
-        SelectedMacroLabel:UpdateName("Selected Macro: " .. selectedMacro)
+        if Value and Value ~= "" then
+            selectedMacro = Value:gsub(".json$", "")
+            SelectedMacroLabel:UpdateName("Selected Macro: " .. selectedMacro)
+        end
     end
 }, "selectedUIMacro")
 
@@ -1179,6 +1195,25 @@ RecordMacroToggle = sections.MainSection80:Toggle({
             }
             startTime = tick()
             print("[MACRO] Recording started...")
+
+            task.spawn(function()
+                local Players = game:GetService("Players")
+                while isRecording do
+                    task.wait(1)
+                    local playerGui = Players.LocalPlayer:FindFirstChild("PlayerGui")
+                    local endGui = playerGui and playerGui:FindFirstChild("GameEndUI")
+
+                    if endGui and endGui.Enabled and endGui.NewFrame and endGui.NewFrame.Visible then
+                        print("[MACRO] Partida finalizada. Parando e salvando a gravação...")
+                        isRecording = false
+
+                        if RecordMacroToggle and typeof(RecordMacroToggle.SetState) == "function" then
+                            RecordMacroToggle:SetState(false)
+                        end
+                        break
+                    end
+                end
+            end)
         else
             isRecording = false
             if recordingData and recordingData.steps and #recordingData.steps > 0 then
@@ -1209,6 +1244,7 @@ PlayMacroToggle = sections.MainSection80:Toggle({
                 isPlaying = false
                 return
             end
+
             isPlaying = true
             task.spawn(function()
                 playMacro(selectedMacro)
