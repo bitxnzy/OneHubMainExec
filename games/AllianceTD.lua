@@ -169,6 +169,7 @@ local recordingData = {
 }
 local startTime = 0
 local selectedMacro = "None"
+<<<<<<< HEAD
 local autoCollectGiftsEnabled = false
 local autoCollectHourlyQuestsEnabled = false
 local autoCollectHalloweenPassEnabled = false
@@ -186,13 +187,19 @@ local sendWebhook -- forward declaration (definida mais abaixo)
 local selectedUIMacro -- forward declaration (dropdown criado mais abaixo)
 local SelectedMacroLabel -- forward declaration (label criado mais abaixo)
 local StepLabel, ActionLabel, WaitingLabel -- forward declaration (status do macro)
+=======
+>>>>>>> 53fd95e (Add Webhook and fixed 99% of issues)
 task.spawn(function()
     task.wait(1.5)
     pcall(function()
         if MacLib.Options and MacLib.Options.selectedUIMacro and MacLib.Options.selectedUIMacro.Value then
             local savedVal = MacLib.Options.selectedUIMacro.Value
             if savedVal and savedVal ~= "" and savedVal ~= "None" then
+<<<<<<< HEAD
                 selectedMacro = savedVal:gsub("%.json$", "")
+=======
+                selectedMacro = savedVal:gsub(".json$", "")
+>>>>>>> 53fd95e (Add Webhook and fixed 99% of issues)
                 if SelectedMacroLabel and typeof(SelectedMacroLabel.UpdateName) == "function" then
                     SelectedMacroLabel:UpdateName("Selected Macro: " .. selectedMacro)
                 end
@@ -397,8 +404,21 @@ local function createJsonFileFunction(fileName)
     if not isfile(filePath) then
         writefile(filePath, "{}")
     end
+<<<<<<< HEAD
     updateDropdownFunction(fileName)
     return true
+=======
+    updateDropdownFunction()
+    selectedMacro = fileName
+
+    if SelectedMacroLabel and typeof(SelectedMacroLabel.UpdateName) == "function" then
+        SelectedMacroLabel:UpdateName("Selected Macro: " .. selectedMacro)
+    end
+
+    if selectedUIMacro then
+        selectedUIMacro:SetOption(fileName)
+    end
+>>>>>>> 53fd95e (Add Webhook and fixed 99% of issues)
 end
 
 updateDropdownFunction()
@@ -583,6 +603,15 @@ local function waitForStepRequirements(step, startedAt)
 end
 
 local function playMacro(macroName)
+    task.spawn(function()
+        task.wait(1)
+        if MacLib.Options and MacLib.Options.selectedUIMacro and MacLib.Options.selectedUIMacro.Value then
+            selectedMacro = MacLib.Options.selectedUIMacro.Value:gsub(".json$", "")
+            if SelectedMacroLabel and typeof(SelectedMacroLabel.UpdateName) == "function" then
+                SelectedMacroLabel:UpdateName("Selected Macro: " .. selectedMacro)
+            end
+        end
+    end)
     if not macroName or macroName == "None" then
         return
     end
@@ -933,6 +962,7 @@ local jaDeuReplay = false
 
 function autoRestartFunction()
     task.spawn(function()
+<<<<<<< HEAD
         local playerGui = player:WaitForChild("PlayerGui")
         local replayRemote = ReplicatedStorage:WaitForChild("RemoteEvents"):WaitForChild("ReplayVote")
 
@@ -960,10 +990,61 @@ function autoRestartFunction()
                 end
             else
                 task.wait(0.1)
+=======
+        local ReplicatedStorage = game:GetService("ReplicatedStorage")
+        local playerGui = player:WaitForChild("PlayerGui")
+        local replayRemote = ReplicatedStorage
+            :WaitForChild("RemoteEvents")
+            :WaitForChild("ReplayVote")
+
+        while autoRestartEnabled do
+            replayRemote:FireServer(true)
+            local deadline = os.clock() + 8
+            local endFrame
+
+            repeat
+                local endGui = playerGui:FindFirstChild("GameEndUI")
+                local frame = endGui and endGui:FindFirstChild("NewFrame")
+
+                if endGui and endGui.Enabled
+                    and frame and frame.Visible then
+                    endFrame = frame
+                    break
+                end
+
+                task.wait(0.03)
+            until not autoRestartEnabled or os.clock() >= deadline
+
+            if not autoRestartEnabled then
+                break
+            end
+
+            if endFrame then
+                task.wait(0.1)
+
+                if autoSendEnabled then
+                    task.spawn(sendWebhook)
+                end
+                repeat
+                    task.wait(0.05)
+
+                    local endGui = playerGui:FindFirstChild("GameEndUI")
+                    local currentFrame = endGui
+                        and endGui:FindFirstChild("NewFrame")
+
+                    if not currentFrame or not currentFrame.Visible
+                        or not endGui.Enabled then
+                        break
+                    end
+                until not autoRestartEnabled
+            else
+                task.wait(1)
+>>>>>>> 53fd95e (Add Webhook and fixed 99% of issues)
             end
         end
     end)
 end
+
 
 local matchesPlayed = 0
 local targetMatches = 1
@@ -974,7 +1055,11 @@ function autoLeaveFunction()
     task.spawn(function()
         local returnRemote = ReplicatedStorage:WaitForChild("ReturnToLobby")
         while autoLeaveEnabled or autoLeaveAfterEnabled do
+<<<<<<< HEAD
             returnRemote:FireServer(true)
+=======
+            game:GetService("ReplicatedStorage"):WaitForChild("ReturnToLobby"):FireServer(true)
+>>>>>>> 53fd95e (Add Webhook and fixed 99% of issues)
 
             if autoLeaveAfterEnabled then
                 matchesPlayed = matchesPlayed + 1
@@ -1087,6 +1172,7 @@ function autoSpeedFunction()
     end)
 end
 
+<<<<<<< HEAD
 local function getText(root, ...)
     local node = root
     for _, childName in ipairs({...}) do
@@ -1096,11 +1182,18 @@ local function getText(root, ...)
 end
 
 function sendWebhook()
+=======
+local webhookUrl = ""
+local autoSendEnabled = false
+
+local function sendWebhook()
+>>>>>>> 53fd95e (Add Webhook and fixed 99% of issues)
     if webhookUrl == "" then
         return
     end
 
     local playerGui = player:FindFirstChild("PlayerGui")
+<<<<<<< HEAD
     if not playerGui then
         return
     end
@@ -1121,6 +1214,21 @@ function sendWebhook()
     local status = getText(upside, "StatusFrame", "Status")
     local mode = getText(upside, "Mode", "Mode")
     local winStreak = getText(upside, "WinStreak", "Title")
+=======
+    if not playerGui then return end
+    
+    local gameEndUI = playerGui:FindFirstChild("GameEndUI")
+    if not gameEndUI then return end
+    
+    local newFrame = gameEndUI:FindFirstChild("NewFrame")
+    if not newFrame then return end
+    local mapDisplayName = workspace:GetAttribute("mapdisplayname") or workspace:GetAttribute("MapDisplayName") or "Unknown Map"
+    local upside = newFrame:FindFirstChild("Upside")
+    local runTime = (upside and upside:FindFirstChild("Timer") and upside.Timer:FindFirstChild("TextLabel")) and upside.Timer.TextLabel.Text or "N/A"
+    local status = (upside and upside:FindFirstChild("StatusFrame") and upside.StatusFrame:FindFirstChild("Status")) and upside.StatusFrame.Status.Text or "N/A"
+    local mode = (upside and upside:FindFirstChild("Mode") and upside.Mode:FindFirstChild("Mode")) and upside.Mode.Mode.Text or "N/A"
+    local winStreak = (upside and upside:FindFirstChild("WinStreak") and upside.WinStreak:FindFirstChild("Title")) and upside.WinStreak.Title.Text or "N/A"
+>>>>>>> 53fd95e (Add Webhook and fixed 99% of issues)
     local rewardsList = {}
     local listRewardsFolder = newFrame:FindFirstChild("ListRewards")
 
@@ -1129,7 +1237,11 @@ function sendWebhook()
             if rewardFrame.Name:sub(1, 7) == "Reward_" then
                 local rewardType = rewardFrame.Name:sub(8)
                 local amountText = "0"
+<<<<<<< HEAD
 
+=======
+                
+>>>>>>> 53fd95e (Add Webhook and fixed 99% of issues)
                 if rewardFrame:FindFirstChild("Amount") then
                     amountText = rewardFrame.Amount.Text
                 end
@@ -1146,6 +1258,7 @@ function sendWebhook()
         ["embeds"] = {{
             ["title"] = "🎮 Match Results Summary",
             ["color"] = embedColor,
+<<<<<<< HEAD
             ["fields"] = {{
                 ["name"] = "🗺️ Map",
                 ["value"] = tostring(mapDisplayName),
@@ -1171,6 +1284,16 @@ function sendWebhook()
                 ["value"] = rewardsFormatted,
                 ["inline"] = false
             }},
+=======
+            ["fields"] = {
+                { ["name"] = "🗺️ Map", ["value"] = tostring(mapDisplayName), ["inline"] = true },
+                { ["name"] = "⏱️ Time", ["value"] = tostring(runTime), ["inline"] = true },
+                { ["name"] = "📊 Status", ["value"] = tostring(status), ["inline"] = true },
+                { ["name"] = "⚔️ Mode", ["value"] = tostring(mode), ["inline"] = true },
+                { ["name"] = "🔥 Win Streak", ["value"] = tostring(winStreak), ["inline"] = true },
+                { ["name"] = "🎁 Rewards", ["value"] = rewardsFormatted, ["inline"] = false }
+            },
+>>>>>>> 53fd95e (Add Webhook and fixed 99% of issues)
             ["footer"] = {
                 ["text"] = "Player: " .. player.Name
             },
@@ -1180,6 +1303,7 @@ function sendWebhook()
 
     local httpRequest = (syn and syn.request) or (http and http.request) or http_request or request
     if httpRequest then
+<<<<<<< HEAD
         pcall(function()
             httpRequest({
                 Url = webhookUrl,
@@ -1190,6 +1314,14 @@ function sendWebhook()
                 Body = HttpService:JSONEncode(payload)
             })
         end)
+=======
+        httpRequest({
+            Url = webhookUrl,
+            Method = "POST",
+            Headers = { ["Content-Type"] = "application/json" },
+            Body = HttpService:JSONEncode(payload)
+        })
+>>>>>>> 53fd95e (Add Webhook and fixed 99% of issues)
     end
 end
 
@@ -1441,9 +1573,21 @@ selectedUIMacro = sections.MainSection80:Dropdown({
     Default = "None",
     Callback = function(Value)
         if Value and Value ~= "" and Value ~= "None" then
+<<<<<<< HEAD
             setSelectedMacro((Value:gsub("%.json$", "")))
         else
             setSelectedMacro("None")
+=======
+            selectedMacro = Value:gsub(".json$", "")
+            if SelectedMacroLabel and typeof(SelectedMacroLabel.UpdateName) == "function" then
+                SelectedMacroLabel:UpdateName("Selected Macro: " .. selectedMacro)
+            end
+        else
+            selectedMacro = "None"
+            if SelectedMacroLabel and typeof(SelectedMacroLabel.UpdateName) == "function" then
+                SelectedMacroLabel:UpdateName("Selected Macro: None")
+            end
+>>>>>>> 53fd95e (Add Webhook and fixed 99% of issues)
         end
     end
 }, "selectedUIMacro")
@@ -1517,6 +1661,11 @@ RecordMacroToggle = sections.MainSection80:Toggle({
     Default = false,
     Callback = function(value)
         if value then
+            if (not selectedMacro or selectedMacro == "None") and macros and #macros > 0 then
+                selectedMacro = macros[1]
+                SelectedMacroLabel:UpdateName("Selected Macro: " .. selectedMacro)
+            end
+
             if not selectedMacro or selectedMacro == "None" then
                 isRecording = false
                 recordingTarget = nil
@@ -1532,8 +1681,12 @@ RecordMacroToggle = sections.MainSection80:Toggle({
                 end)
                 return
             end
+<<<<<<< HEAD
 
             recordingTarget = selectedMacro
+=======
+            
+>>>>>>> 53fd95e (Add Webhook and fixed 99% of issues)
             isRecording = true
             setMacroStatus("Step: 0 (recording)", "Action: Waiting for your first action", "Waiting: Your next action",
                 true)
@@ -1654,16 +1807,26 @@ sections.MainSection99:Toggle({
 sections.MainSection99:Button({
     Name = "Test / Send Webhook Now",
     Callback = function()
+<<<<<<< HEAD
         task.spawn(sendWebhook)
     end
 }, "testWebhookButton")
 
+=======
+        sendWebhook()
+    end
+}, "testWebhookButton")
+
+
+
+>>>>>>> 53fd95e (Add Webhook and fixed 99% of issues)
 task.spawn(function()
     local playerGui = player:WaitForChild("PlayerGui")
     local sending = false
     local lastFrame = nil
 
     while true do
+<<<<<<< HEAD
         if not autoSendEnabled then
             lastFrame = nil
             task.wait(1)
@@ -1691,6 +1854,39 @@ task.spawn(function()
     end
 end)
 
+=======
+        task.wait(0.1)
+
+        if not autoSendEnabled or sending then
+            continue
+        end
+
+        local endGui = playerGui:FindFirstChild("GameEndUI")
+        local frame = endGui and endGui:FindFirstChild("NewFrame")
+
+        if not endGui or not frame or not endGui.Enabled or not frame.Visible then
+            lastFrame = nil
+            continue
+        end
+
+        if frame == lastFrame then
+            continue
+        end
+
+        lastFrame = frame
+        sending = true
+
+        task.spawn(function()
+            task.wait(0.1)
+            sendWebhook()
+            sending = false
+        end)
+    end
+end)
+
+
+
+>>>>>>> 53fd95e (Add Webhook and fixed 99% of issues)
 sections.MainSection100:Toggle({
     Name = "Auto Execute",
     Default = false,
