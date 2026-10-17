@@ -5,7 +5,7 @@ warn("[One HUB] Loading Ui")
 task.wait()
 
 local MacLib =
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/bitxnzy/OneHubMainExec/main/mainexec.lua"))()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/TrilhaX/maclibTempestHubUI/main/maclib.lua"))()
 
 local isMobile = game:GetService("UserInputService").TouchEnabled
 local pcSize = UDim2.fromOffset(850, 650)
@@ -40,7 +40,7 @@ function aeuatFunction()
             queue_on_teleport([[         
                         repeat task.wait() until game:IsLoaded()
                         if getgenv().executedEnabled then return end    
-                        loadstring(game:HttpGet("https://raw.githubusercontent.com/TrilhaX/VoidHubMain/main/Main"))()
+                        loadstring(game:HttpGet("https://raw.githubusercontent.com/bitxnzy/OneHubMainExec/main/mainexec.lua"))()
                     ]])
 
             getgenv().executedEnabled = true
