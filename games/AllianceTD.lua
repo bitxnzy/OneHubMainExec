@@ -560,6 +560,7 @@ local function collectRemoteInfoFunction(remoteName, args)
     table.insert(recordingData.steps, remoteData)
 
 <<<<<<< HEAD
+<<<<<<< HEAD
     setMacroStatus(string.format("Step: %d (recording)", remoteData.index),
         "Action: " .. describeAction(remoteName, remoteData.arguments), "Waiting: Your next action", true)
 =======
@@ -570,6 +571,10 @@ local function collectRemoteInfoFunction(remoteName, args)
         true
     )
 >>>>>>> 797271e (Fixed 100% and improved somethings of script)
+=======
+    setMacroStatus(string.format("Step: %d (recording)", remoteData.index),
+        "Action: " .. describeAction(remoteName, remoteData.arguments), "Waiting: Your next action", true)
+>>>>>>> 4c2344e (Fixed the rest of bugs)
 end
 
 local originalNamecall
@@ -677,6 +682,7 @@ local function playMacro(macroName)
     isPlaying = true
 
 <<<<<<< HEAD
+<<<<<<< HEAD
     setMacroStatus(string.format("Step: 0/%d", #macroData.steps), "Action: Waiting for the match", "Waiting: Wave 1",
         true)
 =======
@@ -687,6 +693,10 @@ local function playMacro(macroName)
         true
     )
 >>>>>>> 797271e (Fixed 100% and improved somethings of script)
+=======
+    setMacroStatus(string.format("Step: 0/%d", #macroData.steps), "Action: Waiting for the match", "Waiting: Wave 1",
+        true)
+>>>>>>> 4c2344e (Fixed the rest of bugs)
 
     local playerGui = player:WaitForChild("PlayerGui")
     while isPlaying do
@@ -733,6 +743,7 @@ local function playMacro(macroName)
         local step = macroData.steps[i]
 
 <<<<<<< HEAD
+<<<<<<< HEAD
         setMacroStatus(string.format("Step: %d/%d", i, totalSteps),
             "Action: " .. describeAction(step.action, step.arguments))
 =======
@@ -741,6 +752,10 @@ local function playMacro(macroName)
             "Action: " .. describeAction(step.action, step.arguments)
         )
 >>>>>>> 797271e (Fixed 100% and improved somethings of script)
+=======
+        setMacroStatus(string.format("Step: %d/%d", i, totalSteps),
+            "Action: " .. describeAction(step.action, step.arguments))
+>>>>>>> 4c2344e (Fixed the rest of bugs)
 
         waitForStepRequirements(step, playbackStartTime)
 
@@ -816,6 +831,7 @@ local function playMacro(macroName)
     isPlaying = false
     if completed then
 <<<<<<< HEAD
+<<<<<<< HEAD
         setMacroStatus(string.format("Step: %d/%d", totalSteps, totalSteps), "Action: Finished", "Waiting: -", true)
 =======
         setMacroStatus(
@@ -825,6 +841,9 @@ local function playMacro(macroName)
             true
         )
 >>>>>>> 797271e (Fixed 100% and improved somethings of script)
+=======
+        setMacroStatus(string.format("Step: %d/%d", totalSteps, totalSteps), "Action: Finished", "Waiting: -", true)
+>>>>>>> 4c2344e (Fixed the rest of bugs)
     else
         resetMacroStatus()
     end
@@ -1066,9 +1085,7 @@ function autoRestartFunction()
 =======
 >>>>>>> 797271e (Fixed 100% and improved somethings of script)
         local playerGui = player:WaitForChild("PlayerGui")
-        local replayRemote = ReplicatedStorage
-            :WaitForChild("RemoteEvents")
-            :WaitForChild("ReplayVote")
+        local replayRemote = ReplicatedStorage:WaitForChild("RemoteEvents"):WaitForChild("ReplayVote")
 
         local function endScreenVisible()
             local endGui = playerGui:FindFirstChild("GameEndUI")
@@ -1103,7 +1120,6 @@ function autoRestartFunction()
         end
     end)
 end
-
 
 local matchesPlayed = 0
 local targetMatches = 1
@@ -1199,6 +1215,7 @@ function autoJoinFunction()
         end
 
 <<<<<<< HEAD
+<<<<<<< HEAD
         local joinQueue = ReplicatedStorage:WaitForChild("Packages"):WaitForChild("_Index"):WaitForChild(
             "sleitnick_knit@1.7.0"):WaitForChild("knit"):WaitForChild("Services"):WaitForChild("MatchmakingService")
             :WaitForChild("RF"):WaitForChild("JoinQueue")
@@ -1207,6 +1224,11 @@ function autoJoinFunction()
             :WaitForChild("sleitnick_knit@1.7.0"):WaitForChild("knit"):WaitForChild("Services")
             :WaitForChild("MatchmakingService"):WaitForChild("RF"):WaitForChild("JoinQueue")
 >>>>>>> 797271e (Fixed 100% and improved somethings of script)
+=======
+        local joinQueue = ReplicatedStorage:WaitForChild("Packages"):WaitForChild("_Index"):WaitForChild(
+            "sleitnick_knit@1.7.0"):WaitForChild("knit"):WaitForChild("Services"):WaitForChild("MatchmakingService")
+            :WaitForChild("RF"):WaitForChild("JoinQueue")
+>>>>>>> 4c2344e (Fixed the rest of bugs)
 
         while autoJoinEnabled do
             local mapId = selectedStory
@@ -1271,10 +1293,14 @@ function sendWebhook()
 
     local playerGui = player:FindFirstChild("PlayerGui")
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 4c2344e (Fixed the rest of bugs)
     if not playerGui then
         return
     end
 
+<<<<<<< HEAD
     local gameEndUI = playerGui:FindFirstChild("GameEndUI")
     if not gameEndUI then
         return
@@ -1294,12 +1320,19 @@ function sendWebhook()
 =======
     if not playerGui then return end
     
+=======
+>>>>>>> 4c2344e (Fixed the rest of bugs)
     local gameEndUI = playerGui:FindFirstChild("GameEndUI")
-    if not gameEndUI then return end
-    
+    if not gameEndUI then
+        return
+    end
+
     local newFrame = gameEndUI:FindFirstChild("NewFrame")
-    if not newFrame then return end
-    local mapDisplayName = workspace:GetAttribute("mapdisplayname") or workspace:GetAttribute("MapDisplayName") or "Unknown Map"
+    if not newFrame then
+        return
+    end
+    local mapDisplayName = workspace:GetAttribute("mapdisplayname") or workspace:GetAttribute("MapDisplayName") or
+                               "Unknown Map"
     local upside = newFrame:FindFirstChild("Upside")
 <<<<<<< HEAD
     local runTime = (upside and upside:FindFirstChild("Timer") and upside.Timer:FindFirstChild("TextLabel")) and upside.Timer.TextLabel.Text or "N/A"
@@ -1322,10 +1355,14 @@ function sendWebhook()
                 local rewardType = rewardFrame.Name:sub(8)
                 local amountText = "0"
 <<<<<<< HEAD
+<<<<<<< HEAD
 
 =======
                 
 >>>>>>> 53fd95e (Add Webhook and fixed 99% of issues)
+=======
+
+>>>>>>> 4c2344e (Fixed the rest of bugs)
                 if rewardFrame:FindFirstChild("Amount") then
                     amountText = rewardFrame.Amount.Text
                 end
@@ -1343,6 +1380,9 @@ function sendWebhook()
             ["title"] = "🎮 Match Results Summary",
             ["color"] = embedColor,
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 4c2344e (Fixed the rest of bugs)
             ["fields"] = {{
                 ["name"] = "🗺️ Map",
                 ["value"] = tostring(mapDisplayName),
@@ -1368,6 +1408,7 @@ function sendWebhook()
                 ["value"] = rewardsFormatted,
                 ["inline"] = false
             }},
+<<<<<<< HEAD
 =======
             ["fields"] = {
                 { ["name"] = "🗺️ Map", ["value"] = tostring(mapDisplayName), ["inline"] = true },
@@ -1378,6 +1419,8 @@ function sendWebhook()
                 { ["name"] = "🎁 Rewards", ["value"] = rewardsFormatted, ["inline"] = false }
             },
 >>>>>>> 53fd95e (Add Webhook and fixed 99% of issues)
+=======
+>>>>>>> 4c2344e (Fixed the rest of bugs)
             ["footer"] = {
                 ["text"] = "Player: " .. player.Name
             },
@@ -1396,6 +1439,7 @@ function sendWebhook()
                 Url = webhookUrl,
                 Method = "POST",
 <<<<<<< HEAD
+<<<<<<< HEAD
                 Headers = {
                     ["Content-Type"] = "application/json"
                 },
@@ -1412,6 +1456,11 @@ function sendWebhook()
 >>>>>>> 53fd95e (Add Webhook and fixed 99% of issues)
 =======
                 Headers = { ["Content-Type"] = "application/json" },
+=======
+                Headers = {
+                    ["Content-Type"] = "application/json"
+                },
+>>>>>>> 4c2344e (Fixed the rest of bugs)
                 Body = HttpService:JSONEncode(payload)
             })
         end)
@@ -1790,8 +1839,13 @@ RecordMacroToggle = sections.MainSection80:Toggle({
 
             recordingTarget = selectedMacro
             isRecording = true
+<<<<<<< HEAD
             setMacroStatus("Step: 0 (recording)", "Action: Waiting for your first action", "Waiting: Your next action", true)
 >>>>>>> 797271e (Fixed 100% and improved somethings of script)
+=======
+            setMacroStatus("Step: 0 (recording)", "Action: Waiting for your first action", "Waiting: Your next action",
+                true)
+>>>>>>> 4c2344e (Fixed the rest of bugs)
             recordingData = {
                 steps = {},
                 currentStepIndex = 0
@@ -1915,6 +1969,7 @@ sections.MainSection99:Button({
     end
 }, "testWebhookButton")
 
+<<<<<<< HEAD
 =======
         sendWebhook()
 =======
@@ -1926,6 +1981,8 @@ sections.MainSection99:Button({
 
 
 >>>>>>> 53fd95e (Add Webhook and fixed 99% of issues)
+=======
+>>>>>>> 4c2344e (Fixed the rest of bugs)
 task.spawn(function()
     local playerGui = player:WaitForChild("PlayerGui")
     local sending = false
@@ -2068,10 +2125,14 @@ end
 
 task.spawn(function()
 <<<<<<< HEAD
+<<<<<<< HEAD
     while task.wait(5) do
 =======
     while task.wait(5) do -- antes: 1s (escrita em disco constante)
 >>>>>>> 797271e (Fixed 100% and improved somethings of script)
+=======
+    while task.wait(5) do
+>>>>>>> 4c2344e (Fixed the rest of bugs)
         saveConfigSafe()
     end
 end)
