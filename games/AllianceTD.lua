@@ -516,12 +516,8 @@ local function collectRemoteInfoFunction(remoteName, args)
 
     table.insert(recordingData.steps, remoteData)
 
-    setMacroStatus(
-        string.format("Step: %d (recording)", remoteData.index),
-        "Action: " .. describeAction(remoteName, remoteData.arguments),
-        "Waiting: Your next action",
-        true
-    )
+    setMacroStatus(string.format("Step: %d (recording)", remoteData.index),
+        "Action: " .. describeAction(remoteName, remoteData.arguments), "Waiting: Your next action", true)
 end
 
 local originalNamecall
@@ -602,12 +598,8 @@ local function playMacro(macroName)
 
     isPlaying = true
 
-    setMacroStatus(
-        string.format("Step: 0/%d", #macroData.steps),
-        "Action: Waiting for the match",
-        "Waiting: Wave 1",
-        true
-    )
+    setMacroStatus(string.format("Step: 0/%d", #macroData.steps), "Action: Waiting for the match", "Waiting: Wave 1",
+        true)
 
     local playerGui = player:WaitForChild("PlayerGui")
     while isPlaying do
@@ -653,10 +645,8 @@ local function playMacro(macroName)
         end
         local step = macroData.steps[i]
 
-        setMacroStatus(
-            string.format("Step: %d/%d", i, totalSteps),
-            "Action: " .. describeAction(step.action, step.arguments)
-        )
+        setMacroStatus(string.format("Step: %d/%d", i, totalSteps),
+            "Action: " .. describeAction(step.action, step.arguments))
 
         waitForStepRequirements(step, playbackStartTime)
 
@@ -731,12 +721,7 @@ local function playMacro(macroName)
 
     isPlaying = false
     if completed then
-        setMacroStatus(
-            string.format("Step: %d/%d", totalSteps, totalSteps),
-            "Action: Finished",
-            "Waiting: -",
-            true
-        )
+        setMacroStatus(string.format("Step: %d/%d", totalSteps, totalSteps), "Action: Finished", "Waiting: -", true)
     else
         resetMacroStatus()
     end
@@ -945,9 +930,7 @@ local jaDeuReplay = false
 function autoRestartFunction()
     task.spawn(function()
         local playerGui = player:WaitForChild("PlayerGui")
-        local replayRemote = ReplicatedStorage
-            :WaitForChild("RemoteEvents")
-            :WaitForChild("ReplayVote")
+        local replayRemote = ReplicatedStorage:WaitForChild("RemoteEvents"):WaitForChild("ReplayVote")
 
         local function endScreenVisible()
             local endGui = playerGui:FindFirstChild("GameEndUI")
@@ -977,7 +960,6 @@ function autoRestartFunction()
         end
     end)
 end
-
 
 local matchesPlayed = 0
 local targetMatches = 1
@@ -1064,9 +1046,9 @@ function autoJoinFunction()
             return
         end
 
-        local joinQueue = ReplicatedStorage:WaitForChild("Packages"):WaitForChild("_Index")
-            :WaitForChild("sleitnick_knit@1.7.0"):WaitForChild("knit"):WaitForChild("Services")
-            :WaitForChild("MatchmakingService"):WaitForChild("RF"):WaitForChild("JoinQueue")
+        local joinQueue = ReplicatedStorage:WaitForChild("Packages"):WaitForChild("_Index"):WaitForChild(
+            "sleitnick_knit@1.7.0"):WaitForChild("knit"):WaitForChild("Services"):WaitForChild("MatchmakingService")
+            :WaitForChild("RF"):WaitForChild("JoinQueue")
 
         while autoJoinEnabled do
             local mapId = selectedStory
@@ -1089,11 +1071,15 @@ end
 
 function autoSpeedFunction()
     task.spawn(function()
-        local remote = game:GetService("ReplicatedStorage"):WaitForChild("RemoteFunctions"):WaitForChild(
-            "GetGameSpeedState")
-        local data = remote:InvokeServer()
-        data.MaxSpeed = 1.5
-        data.Speed = 1.5
+        while autoSpeedEnabled do
+                    local args = {
+            [1] = 1.5
+        }
+
+        game:GetService("ReplicatedStorage"):WaitForChild("RemoteEvents"):WaitForChild("SetGameSpeed"):FireServer(
+            unpack(args))
+            task.wait(1)
+        end
     end)
 end
 
@@ -1111,14 +1097,21 @@ function sendWebhook()
     end
 
     local playerGui = player:FindFirstChild("PlayerGui")
-    if not playerGui then return end
-    
+    if not playerGui then
+        return
+    end
+
     local gameEndUI = playerGui:FindFirstChild("GameEndUI")
-    if not gameEndUI then return end
-    
+    if not gameEndUI then
+        return
+    end
+
     local newFrame = gameEndUI:FindFirstChild("NewFrame")
-    if not newFrame then return end
-    local mapDisplayName = workspace:GetAttribute("mapdisplayname") or workspace:GetAttribute("MapDisplayName") or "Unknown Map"
+    if not newFrame then
+        return
+    end
+    local mapDisplayName = workspace:GetAttribute("mapdisplayname") or workspace:GetAttribute("MapDisplayName") or
+                               "Unknown Map"
     local upside = newFrame:FindFirstChild("Upside")
     local runTime = getText(upside, "Timer", "TextLabel")
     local status = getText(upside, "StatusFrame", "Status")
@@ -1132,7 +1125,7 @@ function sendWebhook()
             if rewardFrame.Name:sub(1, 7) == "Reward_" then
                 local rewardType = rewardFrame.Name:sub(8)
                 local amountText = "0"
-                
+
                 if rewardFrame:FindFirstChild("Amount") then
                     amountText = rewardFrame.Amount.Text
                 end
@@ -1149,14 +1142,31 @@ function sendWebhook()
         ["embeds"] = {{
             ["title"] = "🎮 Match Results Summary",
             ["color"] = embedColor,
-            ["fields"] = {
-                { ["name"] = "🗺️ Map", ["value"] = tostring(mapDisplayName), ["inline"] = true },
-                { ["name"] = "⏱️ Time", ["value"] = tostring(runTime), ["inline"] = true },
-                { ["name"] = "📊 Status", ["value"] = tostring(status), ["inline"] = true },
-                { ["name"] = "⚔️ Mode", ["value"] = tostring(mode), ["inline"] = true },
-                { ["name"] = "🔥 Win Streak", ["value"] = tostring(winStreak), ["inline"] = true },
-                { ["name"] = "🎁 Rewards", ["value"] = rewardsFormatted, ["inline"] = false }
-            },
+            ["fields"] = {{
+                ["name"] = "🗺️ Map",
+                ["value"] = tostring(mapDisplayName),
+                ["inline"] = true
+            }, {
+                ["name"] = "⏱️ Time",
+                ["value"] = tostring(runTime),
+                ["inline"] = true
+            }, {
+                ["name"] = "📊 Status",
+                ["value"] = tostring(status),
+                ["inline"] = true
+            }, {
+                ["name"] = "⚔️ Mode",
+                ["value"] = tostring(mode),
+                ["inline"] = true
+            }, {
+                ["name"] = "🔥 Win Streak",
+                ["value"] = tostring(winStreak),
+                ["inline"] = true
+            }, {
+                ["name"] = "🎁 Rewards",
+                ["value"] = rewardsFormatted,
+                ["inline"] = false
+            }},
             ["footer"] = {
                 ["text"] = "Player: " .. player.Name
             },
@@ -1170,7 +1180,9 @@ function sendWebhook()
             httpRequest({
                 Url = webhookUrl,
                 Method = "POST",
-                Headers = { ["Content-Type"] = "application/json" },
+                Headers = {
+                    ["Content-Type"] = "application/json"
+                },
                 Body = HttpService:JSONEncode(payload)
             })
         end)
@@ -1310,6 +1322,7 @@ sections.MainSection2:Toggle({
     Name = "Auto Speed",
     Default = false,
     Callback = function(value)
+        autoSpeedEnabled = value
         if value then
             autoSpeedFunction()
         end
@@ -1518,7 +1531,8 @@ RecordMacroToggle = sections.MainSection80:Toggle({
 
             recordingTarget = selectedMacro
             isRecording = true
-            setMacroStatus("Step: 0 (recording)", "Action: Waiting for your first action", "Waiting: Your next action", true)
+            setMacroStatus("Step: 0 (recording)", "Action: Waiting for your first action", "Waiting: Your next action",
+                true)
             recordingData = {
                 steps = {},
                 currentStepIndex = 0
@@ -1640,8 +1654,6 @@ sections.MainSection99:Button({
     end
 }, "testWebhookButton")
 
-
-
 task.spawn(function()
     local playerGui = player:WaitForChild("PlayerGui")
     local sending = false
@@ -1735,7 +1747,7 @@ local function saveConfigSafe()
 end
 
 task.spawn(function()
-    while task.wait(5) do -- antes: 1s (escrita em disco constante)
+    while task.wait(5) do
         saveConfigSafe()
     end
 end)

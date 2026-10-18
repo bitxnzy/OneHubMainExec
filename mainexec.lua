@@ -23,7 +23,6 @@ end
 
 local function LoadScript(gameName)
     local url = "https://raw.githubusercontent.com/bitxnzy/OneHubMainExec/main/games/" .. gameName .. ".lua"
-    print(url)
     local success, result = pcall(function()
         return loadstring(game:HttpGet(url))()
     end)
