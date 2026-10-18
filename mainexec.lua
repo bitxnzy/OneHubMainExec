@@ -23,10 +23,14 @@ end
 
 local function LoadScript(gameName)
     local url = "https://raw.githubusercontent.com/bitxnzy/OneHubMainExec/main/games/" .. gameName .. ".lua"
-    local success, result = pcall(function()
-        return loadstring(game:HttpGet(url))()
-    end)
-    return success, result
+
+    local okFetch, src = pcall(game.HttpGet, game, url)
+    if not okFetch then return false, "HttpGet failed: " .. tostring(src) end
+
+    local fn, compileErr = loadstring(src, "=" .. gameName)
+    if not fn then return false, "Compile error: " .. tostring(compileErr) end
+
+    return xpcall(fn, debug.traceback)
 end
 
 if AllowedPlaceIds[currentPlaceId] then
