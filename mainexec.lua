@@ -1,6 +1,7 @@
 local TweenService = game:GetService("TweenService")
 local AllowedPlaceIds = {
     [99703116573266] = true,
+    [8304191830] = true,
 }
 local Games = {
     ["AllianceTD"] = { 99703116573266, 117654154793149 },
